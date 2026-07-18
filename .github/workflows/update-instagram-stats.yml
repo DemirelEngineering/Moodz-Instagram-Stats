@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     # Eén keer per uur, bewust niet exact op minuut 00.
-    - cron: "17 * * * *"
+    - cron: "/5 * * * *"
 
 permissions:
   contents: read
