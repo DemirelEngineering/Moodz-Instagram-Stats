@@ -3,8 +3,7 @@ name: Instagram-statistieken bijwerken
 on:
   workflow_dispatch:
   schedule:
-    # Niet exact op het hele uur: GitHub waarschuwt dat geplande
-    # workflows rond dat moment vaker vertraging kunnen oplopen.
+    # Niet exact op het hele uur, zodat de kans op GitHub-vertraging kleiner is.
     - cron: "17 * * * *"
 
 permissions:
@@ -18,6 +17,8 @@ concurrency:
 
 env:
   INSTAGRAM_USERNAME: ${{ vars.INSTAGRAM_USERNAME || 'moodzcoffeebar' }}
+  # Optioneel. Alleen nodig wanneer Instagram anonieme GitHub-runners blijft blokkeren.
+  INSTAGRAM_SESSIONID: ${{ secrets.INSTAGRAM_SESSIONID }}
 
 jobs:
   build:
@@ -36,7 +37,7 @@ jobs:
           cache: pip
           cache-dependency-path: automation/requirements-instagram.txt
 
-      - name: Selenium installeren
+      - name: Python-pakketten installeren
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r automation/requirements-instagram.txt
@@ -46,7 +47,17 @@ jobs:
           python scripts/update_instagram_stats.py \
             --username "$INSTAGRAM_USERNAME" \
             --output "_site/instagram-stats.json" \
+            --debug-dir "_debug" \
             --timeout 25
+
+      - name: Debuginformatie bewaren
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instagram-debug-${{ github.run_id }}
+          path: _debug
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Kleine Pages-uitvoer afronden
         run: |
