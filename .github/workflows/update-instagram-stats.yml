@@ -3,7 +3,7 @@ name: Instagram-statistieken bijwerken
 on:
   workflow_dispatch:
   schedule:
-    # Niet exact op het hele uur, zodat de kans op GitHub-vertraging kleiner is.
+    # Eén keer per uur, bewust niet exact op minuut 00.
     - cron: "17 * * * *"
 
 permissions:
@@ -17,8 +17,7 @@ concurrency:
 
 env:
   INSTAGRAM_USERNAME: ${{ vars.INSTAGRAM_USERNAME || 'moodzcoffeebar' }}
-  # Optioneel. Alleen nodig wanneer Instagram anonieme GitHub-runners blijft blokkeren.
-  INSTAGRAM_SESSIONID: ${{ secrets.INSTAGRAM_SESSIONID }}
+  STATS_SOURCE_URL: ${{ vars.STATS_SOURCE_URL }}
 
 jobs:
   build:
@@ -42,13 +41,21 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r automation/requirements-instagram.txt
 
-      - name: Instagram-statistieken lezen
+      - name: Bron-URL controleren
+        run: |
+          if [ -z "$STATS_SOURCE_URL" ]; then
+            echo "Repository-variable STATS_SOURCE_URL ontbreekt."
+            exit 1
+          fi
+
+      - name: Statistieken via XPath lezen
         run: |
           python scripts/update_instagram_stats.py \
             --username "$INSTAGRAM_USERNAME" \
+            --source-url "$STATS_SOURCE_URL" \
             --output "_site/instagram-stats.json" \
             --debug-dir "_debug" \
-            --timeout 25
+            --timeout 35
 
       - name: Debuginformatie bewaren
         if: always()
