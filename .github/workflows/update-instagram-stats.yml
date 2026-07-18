@@ -1,0 +1,89 @@
+name: Instagram-statistieken bijwerken
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Niet exact op het hele uur: GitHub waarschuwt dat geplande
+    # workflows rond dat moment vaker vertraging kunnen oplopen.
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: instagram-stats-pages
+  cancel-in-progress: true
+
+env:
+  INSTAGRAM_USERNAME: ${{ vars.INSTAGRAM_USERNAME || 'moodzcoffeebar' }}
+
+jobs:
+  build:
+    name: Statistieken ophalen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Repository ophalen
+        uses: actions/checkout@v6
+
+      - name: Python instellen
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: automation/requirements-instagram.txt
+
+      - name: Selenium installeren
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r automation/requirements-instagram.txt
+
+      - name: Instagram-statistieken lezen
+        run: |
+          python scripts/update_instagram_stats.py \
+            --username "$INSTAGRAM_USERNAME" \
+            --output "_site/instagram-stats.json" \
+            --timeout 25
+
+      - name: Kleine Pages-uitvoer afronden
+        run: |
+          touch _site/.nojekyll
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="nl">
+          <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <meta name="robots" content="noindex, nofollow">
+              <title>Moodz Instagram-statistieken</title>
+          </head>
+          <body>
+              <p>De openbare statistieken staan in <a href="instagram-stats.json">instagram-stats.json</a>.</p>
+          </body>
+          </html>
+          EOF
+
+      - name: GitHub Pages configureren
+        uses: actions/configure-pages@v5
+
+      - name: Pages-bestand uploaden
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: JSON publiceren
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Publiceren naar GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
